@@ -34,3 +34,11 @@ func (p *PatternScanner) Scan(reader *bufio.Reader) bool {
 	}
 	return p.Scan(reader)
 }
+
+func (p *PatternScanner) Read(reader *bufio.Reader) (*Todo, error) {
+	bytes, err := reader.ReadBytes(byte('\n'))
+	if err != nil {
+		return nil, err
+	}
+	return &Todo{Summary: string(bytes)}, nil
+}

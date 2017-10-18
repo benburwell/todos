@@ -31,7 +31,11 @@ func main() {
 		Die(strings.Join(GetErrorMessages(errors), "\n"))
 	}
 
-	todofiles, err := scanDir(".", config)
+	patternScanner, err := NewPatternScanner(fmt.Sprintf("TODO(%s): ", config.Name))
+	if err != nil {
+		Die(fmt.Sprintf("Error creating scanner: %s", err.Error()))
+	}
+	todofiles, err := scanDir(".", config, patternScanner)
 	if err != nil {
 		Die(fmt.Sprintf("Error reading files: %s", err.Error()))
 	}
@@ -44,23 +48,7 @@ func main() {
 	}
 }
 
-func scanTodo(reader *bufio.Reader, config *Config) bool {
-	patternScanner, err := NewPatternScanner(fmt.Sprintf("TODO(%s): ", config.Name))
-	if err != nil {
-		return false
-	}
-	return patternScanner.Scan(reader)
-}
-
-func readTodo(reader *bufio.Reader) (Todo, error) {
-	bytes, err := reader.ReadBytes(byte('\n'))
-	if err != nil {
-		return Todo{}, err
-	}
-	return Todo{Summary: string(bytes)}, nil
-}
-
-func scanFile(filepath string, config *Config) ([]Todo, error) {
+func scanFile(filepath string, scanner *PatternScanner) ([]Todo, error) {
 	f, err := os.Open(filepath)
 	defer f.Close()
 	if err != nil {
@@ -68,17 +56,17 @@ func scanFile(filepath string, config *Config) ([]Todo, error) {
 	}
 	reader := bufio.NewReader(f)
 	var todos []Todo
-	for scanTodo(reader, config) {
-		todo, err := readTodo(reader)
+	for scanner.Scan(reader) {
+		todo, err := scanner.Read(reader)
 		if err != nil {
 			return nil, err
 		}
-		todos = append(todos, todo)
+		todos = append(todos, *todo)
 	}
 	return todos, nil
 }
 
-func scanDir(dir string, config *Config) ([]TodoFile, error) {
+func scanDir(dir string, config *Config, scanner *PatternScanner) ([]TodoFile, error) {
 	fileinfos, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -87,7 +75,7 @@ func scanDir(dir string, config *Config) ([]TodoFile, error) {
 	for _, fileinfo := range fileinfos {
 		if fileinfo.Mode().IsRegular() && config.ShouldScanFile(fileinfo.Name()) {
 			filepath := path.Join(dir, fileinfo.Name())
-			todos, err := scanFile(filepath, config)
+			todos, err := scanFile(filepath, scanner)
 			if err != nil {
 				return nil, err
 			}
@@ -99,7 +87,7 @@ func scanDir(dir string, config *Config) ([]TodoFile, error) {
 			}
 		} else if fileinfo.IsDir() && config.ShouldScanDir(fileinfo.Name()) {
 			dirname := path.Join(dir, fileinfo.Name())
-			infos, err := scanDir(dirname, config)
+			infos, err := scanDir(dirname, config, scanner)
 			if err != nil {
 				return nil, err
 			}
