@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+// Only consider reading files that end with one of these extensions preceeded
+// by a period (e.g. `.go`)
 var includeExtensions = map[string]bool{
 	"css":  true,
 	"go":   true,
@@ -19,16 +21,22 @@ var includeExtensions = map[string]bool{
 	"ts":   true,
 }
 
+// Don't look in any directories with these names
 var ignoreDirs = map[string]bool{
 	".git":         true,
 	"node_modules": true,
 }
 
+// A TodoFile consists of a path relative to the running directory and a
+// collection of Todos that are contained in it
 type TodoFile struct {
 	File  string
 	Todos []Todo
 }
 
+// A Todo holds a Summary
+//
+// In the future, it may also hold other information
 type Todo struct {
 	Summary string
 }
@@ -60,16 +68,19 @@ func main() {
 	}
 }
 
+// Print a message out to standard error and exit the program
 func die(message string) {
 	os.Stderr.WriteString(strings.Join([]string{message, "\n"}, ""))
 	os.Exit(1)
 }
 
+// Determine whether the specified directory name should be scanned
 func shouldScanDir(dir string) bool {
 	_, ok := ignoreDirs[dir]
 	return ok == false
 }
 
+// Determine whether the specified file should be scanned
 func shouldScanFile(f os.FileInfo) bool {
 	parts := strings.Split(f.Name(), ".")
 	if len(parts) < 2 {
@@ -80,22 +91,12 @@ func shouldScanFile(f os.FileInfo) bool {
 	return ok
 }
 
-func makePattern(pattern string) (byte, string) {
-	return byte(pattern[0]), pattern[1:]
-}
-
 func scanTodo(reader *bufio.Reader, name string) bool {
-	startByte, restString := makePattern(fmt.Sprintf("TODO(%s): ", name))
-	_, err := reader.ReadBytes(startByte)
+	patternScanner, err := NewPatternScanner(fmt.Sprintf("TODO(%s): ", name))
 	if err != nil {
 		return false
 	}
-	next, err := reader.Peek(10)
-	if string(next) == restString {
-		reader.Discard(len(restString))
-		return true
-	}
-	return scanTodo(reader, name)
+	return patternScanner.Scan(reader)
 }
 
 func readTodo(reader *bufio.Reader) (Todo, error) {
