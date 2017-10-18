@@ -10,28 +10,6 @@ import (
 	"strings"
 )
 
-// A TodoFile consists of a path relative to the running directory and a
-// collection of Todos that are contained in it
-type TodoFile struct {
-	File  string
-	Todos []Todo
-}
-
-// A Todo holds a Summary
-//
-// In the future, it may also hold other information
-type Todo struct {
-	Summary string
-}
-
-func GetErrorMessages(errs []error) []string {
-	messages := make([]string, len(errs))
-	for i, err := range errs {
-		messages[i] = err.Error()
-	}
-	return messages
-}
-
 func main() {
 	nameArg := flag.String("name", "", "Name to look for")
 	helpArg := flag.Bool("help", false, "Get help")
@@ -50,12 +28,12 @@ func main() {
 	}
 
 	if !isValid {
-		die(strings.Join(GetErrorMessages(errors), "\n"))
+		Die(strings.Join(GetErrorMessages(errors), "\n"))
 	}
 
 	todofiles, err := scanDir(".", config)
 	if err != nil {
-		die(fmt.Sprintf("Error reading files: %s", err.Error()))
+		Die(fmt.Sprintf("Error reading files: %s", err.Error()))
 	}
 
 	for _, f := range todofiles {
@@ -64,12 +42,6 @@ func main() {
 			fmt.Println("  - ", t.Summary)
 		}
 	}
-}
-
-// Print a message out to standard error and exit the program
-func die(message string) {
-	os.Stderr.WriteString(strings.Join([]string{message, "\n"}, ""))
-	os.Exit(1)
 }
 
 func scanTodo(reader *bufio.Reader, config *Config) bool {
