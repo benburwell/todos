@@ -10,23 +10,6 @@ import (
 	"strings"
 )
 
-// Only consider reading files that end with one of these extensions preceeded
-// by a period (e.g. `.go`)
-var includeExtensions = map[string]bool{
-	"css":  true,
-	"go":   true,
-	"java": true,
-	"js":   true,
-	"scss": true,
-	"ts":   true,
-}
-
-// Don't look in any directories with these names
-var ignoreDirs = map[string]bool{
-	".git":         true,
-	"node_modules": true,
-}
-
 // A TodoFile consists of a path relative to the running directory and a
 // collection of Todos that are contained in it
 type TodoFile struct {
@@ -41,6 +24,14 @@ type Todo struct {
 	Summary string
 }
 
+func GetErrorMessages(errs []error) []string {
+	messages := make([]string, len(errs))
+	for i, err := range errs {
+		messages[i] = err.Error()
+	}
+	return messages
+}
+
 func main() {
 	nameArg := flag.String("name", "", "Name to look for")
 	helpArg := flag.Bool("help", false, "Get help")
@@ -51,11 +42,18 @@ func main() {
 		os.Exit(0)
 	}
 
-	if fmt.Sprintf("%s", *nameArg) == "" {
-		die("Name must be specified")
+	config := GetConfig()
+	isValid, errors := config.Validate()
+
+	if fmt.Sprintf("%s", *nameArg) != "" {
+		config.Name = *nameArg
 	}
 
-	todofiles, err := scanDir(".", *nameArg)
+	if !isValid {
+		die(strings.Join(GetErrorMessages(errors), "\n"))
+	}
+
+	todofiles, err := scanDir(".", config)
 	if err != nil {
 		die(fmt.Sprintf("Error reading files: %s", err.Error()))
 	}
@@ -74,25 +72,8 @@ func die(message string) {
 	os.Exit(1)
 }
 
-// Determine whether the specified directory name should be scanned
-func shouldScanDir(dir string) bool {
-	_, ok := ignoreDirs[dir]
-	return ok == false
-}
-
-// Determine whether the specified file should be scanned
-func shouldScanFile(f os.FileInfo) bool {
-	parts := strings.Split(f.Name(), ".")
-	if len(parts) < 2 {
-		return false
-	}
-	ext := parts[len(parts)-1]
-	_, ok := includeExtensions[ext]
-	return ok
-}
-
-func scanTodo(reader *bufio.Reader, name string) bool {
-	patternScanner, err := NewPatternScanner(fmt.Sprintf("TODO(%s): ", name))
+func scanTodo(reader *bufio.Reader, config *Config) bool {
+	patternScanner, err := NewPatternScanner(fmt.Sprintf("TODO(%s): ", config.Name))
 	if err != nil {
 		return false
 	}
@@ -107,7 +88,7 @@ func readTodo(reader *bufio.Reader) (Todo, error) {
 	return Todo{Summary: string(bytes)}, nil
 }
 
-func scanFile(filepath string, name string) ([]Todo, error) {
+func scanFile(filepath string, config *Config) ([]Todo, error) {
 	f, err := os.Open(filepath)
 	defer f.Close()
 	if err != nil {
@@ -115,7 +96,7 @@ func scanFile(filepath string, name string) ([]Todo, error) {
 	}
 	reader := bufio.NewReader(f)
 	var todos []Todo
-	for scanTodo(reader, name) {
+	for scanTodo(reader, config) {
 		todo, err := readTodo(reader)
 		if err != nil {
 			return nil, err
@@ -125,16 +106,16 @@ func scanFile(filepath string, name string) ([]Todo, error) {
 	return todos, nil
 }
 
-func scanDir(dir string, name string) ([]TodoFile, error) {
+func scanDir(dir string, config *Config) ([]TodoFile, error) {
 	fileinfos, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 	var result []TodoFile
 	for _, fileinfo := range fileinfos {
-		if fileinfo.Mode().IsRegular() && shouldScanFile(fileinfo) {
+		if fileinfo.Mode().IsRegular() && config.ShouldScanFile(fileinfo.Name()) {
 			filepath := path.Join(dir, fileinfo.Name())
-			todos, err := scanFile(filepath, name)
+			todos, err := scanFile(filepath, config)
 			if err != nil {
 				return nil, err
 			}
@@ -144,9 +125,9 @@ func scanDir(dir string, name string) ([]TodoFile, error) {
 				todofile.Todos = todos
 				result = append(result, todofile)
 			}
-		} else if fileinfo.IsDir() && shouldScanDir(fileinfo.Name()) {
+		} else if fileinfo.IsDir() && config.ShouldScanDir(fileinfo.Name()) {
 			dirname := path.Join(dir, fileinfo.Name())
-			infos, err := scanDir(dirname, name)
+			infos, err := scanDir(dirname, config)
 			if err != nil {
 				return nil, err
 			}
