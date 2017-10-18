@@ -47,6 +47,10 @@ func main() {
 		}
 		fmt.Println()
 	}
+
+	if len(todofiles) < 1 {
+		os.Exit(1)
+	}
 }
 
 func scanFile(filepath string, scanner *PatternScanner) ([]Todo, error) {

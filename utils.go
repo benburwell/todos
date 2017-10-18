@@ -17,5 +17,5 @@ func GetErrorMessages(errs []error) []string {
 // Print a message out to standard error and exit the program
 func Die(message string) {
 	os.Stderr.WriteString(strings.Join([]string{message, "\n"}, ""))
-	os.Exit(1)
+	os.Exit(2)
 }
