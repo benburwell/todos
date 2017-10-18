@@ -1,13 +1,19 @@
-build: vendor
-	go build .
+SRC_DIR=./src
+BUILD_DIR=./build
+SOURCES=$(wildcard *.go src/*.go src/*/*.go)
+BINARY=todos
 
-install: vendor
-	go install .
+$(BUILD_DIR)/$(BINARY): $(SOURCES) vendor
+	mkdir -p $(BUILD_DIR)
+	go build -o $@ $(SRC_DIR)
+
+install: $(SOURCES) vendor
+	go install $(SRC_DIR)
 
 clean:
-	rm -f todos
+	rm -rf $(BUILD_DIR)
 
 vendor:
 	dep ensure
 
-.PHONY: build install clean
+.PHONY: install clean
