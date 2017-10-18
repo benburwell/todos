@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"strings"
 )
 
 type PatternScanner struct {
@@ -40,5 +41,8 @@ func (p *PatternScanner) Read(reader *bufio.Reader) (*Todo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Todo{Summary: string(bytes)}, nil
+	todo := &Todo{
+		Summary: strings.TrimSpace(string(bytes)),
+	}
+	return todo, nil
 }

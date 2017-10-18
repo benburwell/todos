@@ -45,6 +45,7 @@ func main() {
 		for _, t := range f.Todos {
 			fmt.Println("  - ", t.Summary)
 		}
+		fmt.Println()
 	}
 }
 
